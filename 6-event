@@ -26,9 +26,9 @@ export default class ColumnChart {
   }
 
   async getData (range, url) {
-    await this.createFullUrl(range, url);
+    this.createFullUrl(range, url);
     const data = await fetchJson(this.url.toString());
-    return await data;
+    return data;
   }
 
   downloadСharts(headerData, bodyData = []) {
@@ -43,12 +43,12 @@ export default class ColumnChart {
 
   async showChart () {
     let value = await this.getData(this.range, this.url);
-    this.mapDataFromAllTime = await new Map(Object.entries(value));
-    await this.downloadСharts(this.getNumberData(), this.mapDataFromAllTime);
+    this.mapDataFromAllTime = new Map(Object.entries(value));
+    this.downloadСharts(this.getNumberData(), this.mapDataFromAllTime);
   }
 
   async update(from, to) {
-    this.range = await {from, to};
+    this.range = {from, to};
     await this.showChart();
   }
 
