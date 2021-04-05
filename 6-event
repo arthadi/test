@@ -31,20 +31,28 @@ export default class ColumnChart {
     return data;
   }
 
-  downloadСharts(headerData, bodyData = []) {
+  downloadСharts(headerData = 0, bodyData = '') {
     this.element.classList.add('column-chart_loading');
-
-    if (headerData && bodyData.size) {
+    if (headerData && bodyData.length) {
       this.subElements.header.textContent = headerData;
-      this.subElements.body.innerHTML = this.createChart(bodyData);
+      this.subElements.body.innerHTML = bodyData;
       this.element.classList.remove('column-chart_loading');
     }
   }
 
   async showChart () {
-    let value = await this.getData(this.range, this.url);
+    const value = await this.getData(this.range, this.url);
     this.mapDataFromAllTime = new Map(Object.entries(value));
-    this.downloadСharts(this.getNumberData(), this.mapDataFromAllTime);
+    const dataChart = this.dataChart();
+    this.downloadСharts(dataChart.header, dataChart.body);
+  }
+
+  dataChart() {
+    const data = {
+      header: this.getNumberData(),
+      body: this.createChart(this.getColumnProps(this.mapDataFromAllTime))
+    }
+    return data;
   }
 
   async update(from, to) {
@@ -60,7 +68,7 @@ export default class ColumnChart {
             ${this.getNumberData()}
         </div>
         <div data-element="body" class="column-chart__chart">
-            ${this.createChart(this.mapDataFromAllTime)}
+            ${this.createChart()}
         </div>
       </div>
     </div>
@@ -106,23 +114,21 @@ export default class ColumnChart {
     return `<a class="column-chart__link" href="${this.link}">View all</a>`;
   }
 
-  getColumnProps(data) {
+  getColumnProps(data = 0) {
     const arrayParametrs = data ? [...data.values()] : [];
 
     if (arrayParametrs.length) {
       const maxValue = Math.max(...arrayParametrs);
       const scale = this.chartHeight / maxValue;
-      return new Map([...arrayParametrs.map(item => {
+      return arrayParametrs.map(item => {
         return [(item / maxValue * 100).toFixed(0) + '%', String(Math.floor(item * scale))];
-      })]);
+      });
     }
   }
 
-  createChart(data) {
-    const arrayData = this.getColumnProps(data);
-
-    if (arrayData) {
-      return [...arrayData].map(([key, value]) => `<div style="--value: ${value}" data-tooltip="${key}"></div>`).join('');
+  createChart(data = []) {
+    if (data) {
+      return data.map(([key, value]) => `<div style="--value: ${value}" data-tooltip="${key}"></div>`).join('');
     }
   }
 
