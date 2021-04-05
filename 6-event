@@ -1,181 +1,137 @@
-export default class SortableTable {
+import fetchJson from './utils/fetch-json.js';
+const BACKEND_URL = 'https://course-js.javascript.ru';
 
-    getParametersForSortButton = (event) => {
-        const button = event.currentTarget;
-        const section = button.dataset.id;
-        const orderButton = button.dataset.order;
-        this.headerButtons.map(item => item.dataset.order = '')
-        const newOrderButton = orderButton === 'asc' ? 'desc' : orderButton === 'desc' ? 'asc' : 'desc';
-        button.dataset.order = newOrderButton;
-        this.sort(section, newOrderButton)
+export default class ColumnChart {
+
+  chartHeight = 50;
+
+  constructor({
+    label = '',
+    link = '',
+    formatHeading = data => data,
+    url = '',
+    range = {},
+    } = {}) {
+    this.url = new URL(url, BACKEND_URL);
+    this.range = range;
+    this.label = label;
+    this.link = link;
+    this.formatHeading = formatHeading;
+    this.render();
+    this.showChart();
+  }
+
+  createFullUrl(range, url) {
+    Object.entries(range).forEach(([key, value]) => url.searchParams.set(key, value));
+  }
+
+  async getData (range, url) {
+    await this.createFullUrl(range, url);
+    const data = await fetchJson(this.url.toString());
+    return await data;
+  }
+
+  downloadСharts(headerData, bodyData = []) {
+    this.element.classList.add('column-chart_loading');
+
+    if (headerData && bodyData.size) {
+      this.subElements.header.textContent = headerData;
+      this.subElements.body.innerHTML = this.createChart(bodyData);
+      this.element.classList.remove('column-chart_loading');
     }
+  }
 
-    dataHeader = {};
-    subElements;
-    element;
-    headerButtons;
+  async showChart () {
+    let value = await this.getData(this.range, this.url);
+    this.mapDataFromAllTime = await new Map(Object.entries(value));
+    await this.downloadСharts(this.getNumberData(), this.mapDataFromAllTime);
+  }
 
-    constructor(header = [], { data } = []) {
-        this.header = header;
-        this.data = data;
-        this.render();
-        this.setEventHeaderButtons ();
+  async update(from, to) {
+    this.range = await {from, to};
+    await this.showChart();
+  }
+
+  get template() {
+    return `<div class="column-chart column-chart_loading" style="--chart-height: ${this.chartHeight}">
+      <div class="column-chart__title">${this.label}${this.checkLink()}</div>
+      <div class="column-chart__container">
+        <div data-element="header" class="column-chart__header">
+            ${this.getNumberData()}
+        </div>
+        <div data-element="body" class="column-chart__chart">
+            ${this.createChart(this.mapDataFromAllTime)}
+        </div>
+      </div>
+    </div>
+    `;
+  }
+
+   render() {
+   const element = document.createElement('div');
+   element.innerHTML = this.template;
+   this.element = element.firstElementChild;
+   this.subElements = this.getSubElements(this.element);
+  }
+
+  getSubElements(element) {
+    const elements = element.querySelectorAll('[data-element]');
+    return [...elements].reduce((accum, subElement) => {
+      accum[subElement.dataset.element] = subElement;
+      return accum;
+    }, {});
+  }
+
+  getNumberData() {
+
+    if (this.mapDataFromAllTime) {
+      const sum = [...this.mapDataFromAllTime.values()].reduce((accum, next) => accum + next);
+
+      if (this.formatHeading) {
+        return this.formatHeading(sum);
+      }
+      this.formatHeading = sum;
+      return  sum;
+
+    } else {
+      return 1;
     }
+  }
 
-    getDataHeader() {
-        const nameSectionArray = this.header.map(item => item.id);
-        const object = nameSectionArray.reduce( (accum, next) => {
-            accum[next] = [];
-            return accum;
-        }, {})
+  checkLink() {
+    return this.link ? this.appendLink() : '';
+  }
 
-        this.dataHeader = this.header.reduce((accum, next) => {
-                accum[next.id].push(next.id, next.title, next.sortable, next.sortType ? next.sortType : 'template');
-                return accum;
-            },
-            object);
+  appendLink() {
+    return `<a class="column-chart__link" href="${this.link}">View all</a>`;
+  }
+
+  getColumnProps(data) {
+    const arrayParametrs = data ? [...data.values()] : [];
+
+    if (arrayParametrs.length) {
+      const maxValue = Math.max(...arrayParametrs);
+      const scale = this.chartHeight / maxValue;
+      return new Map([...arrayParametrs.map(item => {
+        return [(item / maxValue * 100).toFixed(0) + '%', String(Math.floor(item * scale))];
+      })]);
     }
+  }
 
-    get templateHeaderArrow() {
-        return `
-    <span data-element="arrow" class="sortable-table__sort-arrow">
-          <span class="sort-arrow"></span>
-    </span>`;
+  createChart(data) {
+    const arrayData = this.getColumnProps(data);
+
+    if (arrayData) {
+      return [...arrayData].map(([key, value]) => `<div style="--value: ${value}" data-tooltip="${key}"></div>`).join('');
     }
+  }
 
-    buildRowHeader([id, title, sortable]) {
-        return `
-      <div class="sortable-table__cell" data-id="${id}" data-sortable="${sortable}" ${sortable === true ? 'data-order="asc"' : ''}>
-        <span>${title}</span>${sortable === true ? this.templateHeaderArrow : ''}
-      </div>`;
-    }
+  remove () {
+    this.element.remove();
+  }
 
-    getHeaderContainer() {
-        return `
-    <div data-element="header" class="sortable-table__header sortable-table__row">
-      ${Object.entries(this.dataHeader).map( (item) => this.buildRowHeader(item[1])).join('')}
-    </div>`;
-    }
-
-    buildRowTable(data) {
-        return this.header.map((element) => {
-            if (!element.sortable) {
-                return  element.template(data.images);
-            }
-            if(element.sortable) {
-                return `
-          <div class="sortable-table__cell">${data[element.id]}</div>`;
-            }
-        }).join('');
-    }
-
-    getRowTable(obj = this.resultSort ('title', 'asc', this.data)) {
-        return obj.map( (data) => {
-            return `
-        <a href="/products/3d-ochki-epson-elpgs03" class="sortable-table__row">
-          ${this.buildRowTable(data)}
-        </a>`
-        }).join('');
-    }
-
-    getTableContainer() {
-        return `
-    <div data-element="body" class="sortable-table__body">
-        ${this.getRowTable()}
-    </div>`;
-    }
-
-    getMainContainer() {
-        return `
-    <div data-element="productsContainer" class="products-list__container">
-       <div class="sortable-table">
-          ${this.getHeaderContainer()}
-          ${this.getTableContainer()}
-       </div>
-    </div>`;
-    }
-
-    render() {
-        this.getDataHeader();
-        const div = document.createElement('div');
-        div.innerHTML = this.getMainContainer();
-        const element = div.firstElementChild;
-        this.element = element;
-        this.subElements = this.getSubElements(element);
-    }
-
-    sortValueString(fieldValue = 'title', orderValue = 'asc', arraySort = this.data) {
-
-        let arrayForSort = arraySort.map( (item) => item[fieldValue]);
-
-        const directions = {
-            asc: 1,
-            desc: -1
-        };
-        return  arrayForSort.sort((a, b) => {
-            return a.localeCompare(b, ['ru', 'en'], { caseFirst: 'upper'}) * directions[orderValue];
-        });
-    }
-
-    sortValueNumber(fieldValue, orderValue, arraySort = this.data) {
-        let arrayForSort = arraySort.map( (item) => item[fieldValue]);
-
-        return  arrayForSort.sort((a, b) => {
-            switch (orderValue) {
-                case 'asc':
-                    return  a - b;
-                case 'desc':
-                    return  b - a
-            }
-        });
-    }
-
-    sort(fieldValue, orderValue, arrySort = this.data) {
-
-        const resultSort = this.resultSort (fieldValue, orderValue, arrySort = this.data);
-
-        this.subElements.body.innerHTML = this.getRowTable(resultSort);
-    }
-
-    resultSort (fieldValue, orderValue, arrySort = this.data) {
-        let sortArray;
-
-        if(typeof this.data[0][fieldValue] === 'string') {
-
-            sortArray = this.sortValueString(fieldValue, orderValue, arrySort,);
-        } else {
-
-            sortArray = this.sortValueNumber(fieldValue, orderValue, arrySort);
-        }
-        const resultSort = [];
-
-        for(const value of sortArray) {
-
-            resultSort.push(arrySort.find((item) => item[fieldValue] === value));
-        }
-
-        return resultSort;
-    }
-
-    getSubElements(element) {
-        const elements = element.querySelectorAll('[data-element]');
-        return [...elements].reduce((accum, subElement) => {
-            accum[subElement.dataset.element] = subElement;
-            return accum;
-        }, {});
-    }
-
-    setEventHeaderButtons () {
-        const buttons = [...this.subElements.header.querySelectorAll('[data-order]')]
-            .filter((item) => item.dataset.sortable === 'true');
-        this.headerButtons = buttons;
-        for (const button of buttons) {
-            button.addEventListener('pointerdown', this.getParametersForSortButton);
-        }
-    }
-
-    destroy(){
-        this.element.remove();
-        this.subElements = {};
-    }
+  destroy() {
+    this.remove();
+    // NOTE: удаляем обработчики событий, если они есть
+  }
 }
