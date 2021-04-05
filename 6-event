@@ -25,9 +25,9 @@ export default class ColumnChart {
     Object.entries(range).forEach(([key, value]) => url.searchParams.set(key, value));
   }
 
-  async getData (range, url) {
+  getData (range, url) {
     this.createFullUrl(range, url);
-    const data = await fetchJson(this.url.toString());
+    const data = fetchJson(this.url.toString());
     return data;
   }
 
@@ -43,16 +43,15 @@ export default class ColumnChart {
   async showChart () {
     const value = await this.getData(this.range, this.url);
     this.mapDataFromAllTime = new Map(Object.entries(value));
-    const dataChart = this.dataChart();
-    this.downloadСharts(dataChart.header, dataChart.body);
+    this.dataChart();
+    this.downloadСharts(this.allDataChart.header, this.allDataChart.body);
   }
 
   dataChart() {
-    const data = {
+    this.allDataChart = {
       header: this.getNumberData(),
       body: this.createChart(this.getColumnProps(this.mapDataFromAllTime))
     }
-    return data;
   }
 
   async update(from, to) {
