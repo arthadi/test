@@ -4,18 +4,16 @@ export default class RangePicker {
   mapArray = [];
   currentMonth = {};
   flag = Boolean;
-  month = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь','октябрь', 'ноябрь', 'декабрь'];
+  month = this.getArrayMonth();
   renderDate = {
     from: '',
     to: '',
   }
-  eventSelect = new CustomEvent('date-select', {
-    bubbles: true,
-    detail: {
-      from: 0,
-      to: 0
-    }
-  });
+
+  getArrayMonth() {
+    return Array(12).fill(1).map((item, i) =>
+    new Date(`2000.${i + 1}.1`).toLocaleString('ru-RU', {month: 'long'}));
+  }
 
   onClosePicker = (event) => {
     if (!event.target.closest(`.${this.element.classList[0]}`)) {
@@ -26,11 +24,9 @@ export default class RangePicker {
 
   onPlace = (event) => {
     this.element.classList.remove('rangepicker_open');
-    const stringRange = this.getStringFromDate(this.range);
-    this.subElement.from.innerHTML = stringRange[0];
-    this.subElement.to.innerHTML = stringRange[1];
-    this.eventSelect.detail.from = 0;
-    this.eventSelect.detail.to = 0;
+    const [from, to] = this.getStringFromDate(this.range);
+    this.subElement.from.innerHTML = from;
+    this.subElement.to.innerHTML = to;
     document.removeEventListener('pointerup', this.onClosePicker);
   }
 
@@ -39,14 +35,15 @@ export default class RangePicker {
       if (event.target.closest(`[data-element="input"]`)) {
           document.addEventListener('pointerup', this.onClosePicker);
           this.element.classList.add('rangepicker_open');
+          this.eventSelect = this.generateEvent();
       }
       if(event.target.closest('.rangepicker__selector-control-right')) {
           this.flag = true;
-          this.cangeCalendar();
+          this.changeCalendar();
       }
       if (event.target.closest('.rangepicker__selector-control-left')) {
           this.flag = false;
-          this.cangeCalendar();
+          this.changeCalendar();
       }
       if (event.target.closest('[data-value]')) {
 
@@ -67,7 +64,7 @@ export default class RangePicker {
             this.eventSelect.detail.to = event.target.dataset.value;
             this.range.from = new Date(Date.parse(this.eventSelect.detail.from) - this.oneDayMs);
             this.range.to = new Date(Date.parse(this.eventSelect.detail.to) - this.oneDayMs);
-            this.cangeCalendar();
+            this.changeCalendar();
             this.element.dispatchEvent(this.eventSelect);
         }
      }
@@ -80,6 +77,7 @@ export default class RangePicker {
      }){
         this.range = range;
         this.getCurrentMonth()
+        this.getArrayMonth();
         this.render();
         this.initEvent();
   }
@@ -94,7 +92,7 @@ export default class RangePicker {
     });
   }
 
-  cangeCalendar() {
+  changeCalendar() {
     const div = document.createElement('div');
     this.getCurrentMonth(this.currentMonth);
     this.mapArray.length = 0;
@@ -102,8 +100,7 @@ export default class RangePicker {
     div.innerHTML = this.showToMonth(this.currentMonth);
     const newCalendar = div.querySelectorAll('.rangepicker__calendar');
     const oldCalendar = this.subElement.selector.querySelectorAll('.rangepicker__calendar');
-    oldCalendar.forEach((item) => item.remove());
-    newCalendar.forEach((elem) => this.subElement.selector.append(elem));
+    newCalendar.forEach((elem, i) => oldCalendar[i].replaceWith(elem));
   }
 
   get template() {
@@ -190,7 +187,7 @@ export default class RangePicker {
     const year = date.getFullYear();
     const firstDayToMonth = new Date(year, month - 1,1).getDay() === 0 ? 7 : new Date(year, month - 1,1).getDay();
     const countDayToMonth = new Date(year, month, 0).getDate();
-    const style = 'style="--start-from:' + firstDayToMonth + '"';
+    const style = `style="--start-from:${firstDayToMonth}"`;
     const addClass = 'rangepicker__selected-between';
     const addClassFrom = 'rangepicker__selected-from';
     const addClassTo = 'rangepicker__selected-to';
@@ -203,12 +200,11 @@ export default class RangePicker {
 
     Array(countDayToMonth).fill().forEach((item, index) => {
         const nextDay = new Date(year, month - 1, index + 2);
-        const dataValue = nextDay.toISOString();
           mapDate.set( index + 1, {
             year: year,
             month: month,
             style: index === 0 ? style : '',
-            date: dataValue,
+            date: nextDay.toISOString(),
             css: this.range.from  - nextDay + this.oneDayMs < 0 && this.range.to - nextDay + this.oneDayMs > 0 &&
             this.range.from  - nextDay + this.oneDayMs !== 0 &&
             this.range.to  - nextDay + this.oneDayMs !== 0  ? addClass : '',
@@ -227,6 +223,16 @@ export default class RangePicker {
     this.subElement = this.getSubElements(this.element);
   }
 
+  generateEvent(from = '', to = '') {
+    return new CustomEvent('date-select', {
+      bubbles: true,
+      detail: {
+        from,
+        to
+      }
+    })
+  }
+
   getSubElements(element) {
     const elements = element.querySelectorAll('[data-element]');
     return [...elements].reduce((accum, subElement) => {
@@ -237,7 +243,6 @@ export default class RangePicker {
 
   initEvent() {
     this.element.addEventListener('pointerdown', this.onClick);
-
   }
 
   remove() {
