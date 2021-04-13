@@ -105,7 +105,7 @@ export default class ProductForm {
 
   templateCategories(){
     return this.resultCategoriesData.map((category) => {
-      if( category.subcategories ) {
+      if (category.subcategories && category.subcategories.length) {
       return category.subcategories.map((subcategory) => {
         return `
           <option value="${subcategory.id}" ${this.resultProductsData && subcategory.id === this.resultProductsData.subcategories ? 'selected="selected"' : ''}> ${category.title} &gt; ${subcategory.title}</option>`;
